@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚖️ Themis AI - Active Inference Reasoning</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .chat-box {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            background: #667eea;
+            color: white;
+            margin-left: 20%;
+            text-align: right;
+        }
+        
+        .ai-message {
+            background: white;
+            color: #333;
+            margin-right: 20%;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .prediction {
+            margin-top: 8px;
+            padding: 8px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .confidence {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 2px 8px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #question-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        #question-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        #ask-button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        #ask-button:hover {
+            background: #5568d3;
+        }
+        
+        #ask-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .examples {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .examples h3 {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+        
+        .example-btn {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-style: italic;
+        }
+        
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚖️ Themis AI</h1>
+            <p>Active Inference Reasoning System</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">3.5M</div>
+                <div class="stat-label">Parameters</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">58.3%</div>
+                <div class="stat-label">Accuracy</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">GPU</div>
+                <div class="stat-label">Accelerated</div>
+            </div>
+        </div>
+        
+        <div id="chat-box" class="chat-box">
+            <div class="ai-message message">
+                <strong>🤖 Themis AI:</strong><br>
+                Hello! I'm Themis, an Active Inference AI trained to solve reasoning tasks. 
+                Ask me math questions, patterns, or logic puzzles!
+            </div>
+        </div>
+        
+        <div class="input-area">
+            <input 
+                type="text" 
+                id="question-input" 
+                placeholder="Ask me anything... (e.g., If A = 5 and B = 3, then A + B = )"
+                onkeypress="handleKeyPress(event)"
+            />
+            <button id="ask-button" onclick="askQuestion()">Ask</button>
+        </div>
+        
+        <div class="examples">
+            <h3>Try these examples:</h3>
+            <div id="examples-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // Load examples on page load
+        window.onload = function() {
+            loadExamples();
+        };
+        
+        async function loadExamples() {
+            try {
+                const response = await fetch('/examples');
+                const data = await response.json();
+                const container = document.getElementById('examples-container');
+                
+                data.examples.forEach(example => {
+                    const btn = document.createElement('button');
+                    btn.className = 'example-btn';
+                    btn.textContent = example.substring(0, 30) + '...';
+                    btn.onclick = () => {
+                        document.getElementById('question-input').value = example;
+                        askQuestion();
+                    };
+                    container.appendChild(btn);
+                });
+            } catch (error) {
+                console.error('Error loading examples:', error);
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                askQuestion();
+            }
+        }
+        
+        async function askQuestion() {
+            const input = document.getElementById('question-input');
+            const button = document.getElementById('ask-button');
+            const chatBox = document.getElementById('chat-box');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            // Disable input
+            button.disabled = true;
+            input.disabled = true;
+            
+            // Show user message
+            addMessage('user', question);
+            
+            // Show loading
+            const loadingId = addMessage('ai', '<span class="loading">🤔 Thinking...</span>');
+            
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                // Remove loading message
+                document.getElementById(loadingId).remove();
+                
+                if (data.success) {
+                    // Show AI response: full answer first, then the per-step breakdown
+                    let responseHtml = '<strong>🤖 Themis AI:</strong><br>';
+                    responseHtml += `<div style="font-size:1.3em; margin:8px 0;"><strong>${data.answer}</strong></div>`;
+
+                    if (data.steps && data.steps.length > 0) {
+                        responseHtml += '<div style="opacity:0.7; font-size:0.85em;">Generated step by step:</div>';
+                        data.steps.forEach((step, idx) => {
+                            const confidence = (step.confidence * 100).toFixed(0);
+                            responseHtml += `
+                                <div class="prediction">
+                                    ${idx + 1}. "<strong>${step.token}</strong>"
+                                    <span class="confidence">${confidence}%</span>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    addMessage('ai', responseHtml);
+                } else {
+                    addMessage('ai', `<strong>❌ Error:</strong> ${data.error}`);
+                }
+                
+            } catch (error) {
+                document.getElementById(loadingId).remove();
+                addMessage('ai', `<strong>❌ Error:</strong> ${error.message}`);
+            }
+            
+            // Re-enable input
+            button.disabled = false;
+            input.disabled = false;
+            input.value = '';
+            input.focus();
+        }
+        
+        function addMessage(type, content) {
+            const chatBox = document.getElementById('chat-box');
+            const messageDiv = document.createElement('div');
+            const messageId = 'msg-' + Date.now();
+            
+            messageDiv.id = messageId;
+            messageDiv.className = `message ${type}-message`;
+            
+            if (type === 'user') {
+                messageDiv.innerHTML = `<strong>You:</strong><br>${content}`;
+            } else {
+                messageDiv.innerHTML = content;
+            }
+            
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            return messageId;
+        }
+    </script>
+</body>
+</html>

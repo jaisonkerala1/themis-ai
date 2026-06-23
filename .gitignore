@@ -1,0 +1,29 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+
+# Model checkpoints (large binary files - too big for git)
+*.pt
+*.pth
+*.ckpt
+
+# Datasets (large / regenerable)
+tinystories_prepared.json
+training_dataset_large.json
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

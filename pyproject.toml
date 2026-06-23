@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "themis"
+version = "0.1.0"
+description = "Themis — Active Inference AI built on Karl Friston's Free Energy Principle. A tiny model that discovers natural law."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Themis Team"},
+]
+keywords = ["active-inference", "free-energy-principle", "AI", "karl-friston", "generative-model", "themis"]
+
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "hypothesis>=6.0.0",
+]
+tracking = [
+    "wandb>=0.15.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["themis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
