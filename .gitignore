@@ -1,4 +1,4 @@
-# Virtual environment
+# Virtual environment (huge - never commit)
 .venv/
 venv/
 env/
@@ -10,14 +10,13 @@ __pycache__/
 .pytest_cache/
 .hypothesis/
 
-# Model checkpoints (large binary files - too big for git)
+# Trained model checkpoints (large binaries - use Drive/releases instead)
 *.pt
 *.pth
 *.ckpt
 
-# Datasets (large / regenerable)
+# Large prepared datasets (regenerate or download)
 tinystories_prepared.json
-training_dataset_large.json
 
 # IDE / OS
 .vscode/
@@ -25,5 +24,6 @@ training_dataset_large.json
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs / temp
 *.log
+test_save.pt
