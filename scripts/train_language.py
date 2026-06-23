@@ -55,8 +55,8 @@ def main():
     # Lighter inner loops for speed; we rely on supervised next-token signal
     config.perception.n_iterations = 4
     config.training.learning_rate = 1e-3
-    config.training.batch_size = 16
-    config.training.replay_buffer_size = 300_000  # hold all language transitions
+    config.training.batch_size = 64    # T4 handles this easily -> faster, better gradients
+    config.training.replay_buffer_size = 5_000_000  # hold all language transitions
     # Emphasize next-token (policy) learning; keep a little VFE for the world model.
     # Without this, the large reconstruction loss drowns the language signal.
     config.training.vfe_weight = 0.02
@@ -93,10 +93,18 @@ def main():
 
     # Train
     print("[4] Training...")
-    epochs = 12000
+    epochs = 30000
     seq_len = 16
     print(f"Epochs: {epochs} | seq_len: {seq_len} | batch: {config.training.batch_size}")
     print()
+
+    # If running on Colab with Drive mounted, save checkpoints there too so
+    # disconnects don't lose progress.
+    drive_dir = "/content/drive/MyDrive/themis"
+    drive_available = os.path.isdir(drive_dir)
+    if drive_available:
+        print(f"Google Drive detected - checkpoints will also be copied to {drive_dir}")
+        print()
 
     best_loss = float('inf')
     loss_history = []
@@ -119,6 +127,10 @@ def main():
                 orchestrator.save_checkpoint(path)
                 if os.path.exists(path):
                     print(f"  💾 saved {path}")
+                    # Persist to Drive if available (survives Colab disconnects)
+                    if drive_available:
+                        import shutil
+                        shutil.copy(path, os.path.join(drive_dir, path))
             except Exception as e:
                 print(f"  save error: {e}")
 

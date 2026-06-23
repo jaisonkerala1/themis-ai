@@ -45,18 +45,18 @@ class CoreDims:
     Kept small to fit in 4GB VRAM.
     """
     # Latent state dimensions per hierarchy level
-    state_dim: int = 256            # Hidden state size (s) [SCALED UP]
-    state_dim_stochastic: int = 64  # Stochastic part of state (z) [SCALED UP]
-    state_dim_deterministic: int = 192  # Deterministic part (h) [SCALED UP]
+    state_dim: int = 384            # Hidden state size (s) [SCALED for Colab T4]
+    state_dim_stochastic: int = 96  # Stochastic part of state (z) [SCALED]
+    state_dim_deterministic: int = 288  # Deterministic part (h) [SCALED]
 
     # Observation / embedding dimensions
-    obs_embed_dim: int = 256       # Encoded observation dimension [SCALED UP]
-    action_dim: int = 128          # Action embedding dimension [SCALED UP]
+    obs_embed_dim: int = 384       # Encoded observation dimension [SCALED]
+    action_dim: int = 192          # Action embedding dimension [SCALED]
 
     # Text-specific
     vocab_size: int = 8192         # Small BPE vocabulary (text-first, compact)
     max_seq_len: int = 512         # Maximum sequence length
-    token_embed_dim: int = 256     # Token embedding dimension [SCALED UP]
+    token_embed_dim: int = 384     # Token embedding dimension [SCALED]
 
     # Hierarchy
     n_hierarchy_levels: int = 3    # Number of world model levels
@@ -82,12 +82,12 @@ class PerceptionConfig:
 class WorldModelConfig:
     """Layer 3: Hierarchical RSSM generative model."""
     n_levels: int = 3
-    state_dim: int = 256
-    state_dim_stochastic: int = 64
-    state_dim_deterministic: int = 192
-    action_dim: int = 128
-    obs_embed_dim: int = 256
-    hidden_dim: int = 512          # MLP hidden layer size [SCALED UP]
+    state_dim: int = 384
+    state_dim_stochastic: int = 96
+    state_dim_deterministic: int = 288
+    action_dim: int = 192
+    obs_embed_dim: int = 384
+    hidden_dim: int = 768          # MLP hidden layer size [SCALED for Colab T4]
     n_categories: int = 16         # For categorical latent (if used)
     min_std: float = 0.1           # Minimum std for Gaussian posteriors
     timescales: tuple = (1, 4, 16)

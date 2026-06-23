@@ -24,8 +24,8 @@ def main():
     print("=" * 70)
     print()
 
-    # How many stories to use (keep modest for a small model + laptop)
-    NUM_STORIES = 2000
+    # How many stories to use (Colab T4 can handle far more than the laptop)
+    NUM_STORIES = 20000
     # Max characters per story to keep sequences manageable
     MAX_CHARS = 200
 
