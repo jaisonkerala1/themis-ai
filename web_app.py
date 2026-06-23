@@ -1,6 +1,7 @@
 """
 Themis AI - Interactive Web Interface
-A simple Flask web app to interact with your trained AI
+Loads BOTH models (math/QA and language) and shows both answers so you can
+test each in one place.
 """
 
 import sys
@@ -13,143 +14,150 @@ sys.path.append(os.getcwd())
 from themis.config import ThemisConfig
 from themis.layers.orchestrator import Orchestrator
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Global model variables
-model = None
-config = None
 device = None
+math_model = None      # checkpoint_real_ai.pt (math + word facts)
+lang_model = None      # checkpoint_language.pt (English stories)
 
-def load_model():
-    """Load the trained model once at startup"""
-    global model, config, device
-    
-    print("Loading Themis AI model...")
-    config = ThemisConfig()
-    device = config.resolve_device()
-    
-    model = Orchestrator(config)
-    # Load the working Active Inference model (trained with AMP fix + end-to-end gradients)
-    checkpoint_path = "checkpoint_real_ai.pt" if os.path.exists("checkpoint_real_ai.pt") else "checkpoint_simple.pt"
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    model.load_state_dict(checkpoint['model_state'])
-    model.eval()
-    
-    print(f"✓ Model loaded successfully on {device}")
-    print(f"✓ Checkpoint: {checkpoint_path}")
-    print(f"✓ Parameters: ~3.5M")
-    print("✓ Ready to answer questions!")
+LANG_CONTEXT_WINDOW = 64
 
-def predict_answer(question):
-    """Generate a full multi-token answer using autoregressive decoding.
 
-    Replicates training: carry the recurrent state forward and feed the
-    previous action each step, so the model tracks progress and knows when
-    to stop ([EOS]). This produces full answers like "10", "Paris", "cold".
-    """
-    tokenizer = model.markov_blanket.tokenizer
-    max_tokens = 12
+def _load_one(path):
+    """Load a single model using the config stored in its checkpoint."""
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    checkpoint = torch.load(path, map_location=dev, weights_only=False)
+    cfg = checkpoint["config"] if checkpoint.get("config") is not None else ThemisConfig()
+    m = Orchestrator(cfg)
+    m.load_state_dict(checkpoint["model_state"])
+    m = m.to(cfg.resolve_device())
+    m.eval()
+    n = sum(p.numel() for p in m.parameters())
+    print(f"  loaded {path}  ({n/1e6:.1f}M params)")
+    return m
+
+
+def load_models():
+    global device, math_model, lang_model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Loading models...")
+    if os.path.exists("checkpoint_real_ai.pt"):
+        math_model = _load_one("checkpoint_real_ai.pt")
+    if os.path.exists("checkpoint_language.pt"):
+        lang_model = _load_one("checkpoint_language.pt")
+    if math_model is None and lang_model is None:
+        raise RuntimeError("No checkpoints found (checkpoint_real_ai.pt / checkpoint_language.pt)")
+    print(f"Ready on {device}")
+
+
+def generate_math(question, max_tokens=12):
+    """Short-answer generation (math/QA): full context, deterministic, stop at EOS."""
+    if math_model is None:
+        return None
+    m = math_model
+    tok = m.markov_blanket.tokenizer
     generated = ""
-    steps = []
-
     with torch.no_grad():
-        states = model.world_model.get_initial_states(1, device, torch.float32)
+        states = m.world_model.get_initial_states(1, m.config.resolve_device(), torch.float32)
         prev_action = None
         for _ in range(max_tokens):
             context = question + " " + generated
-
-            obs_dist = model.markov_blanket.encode_batch([context])
-            h_states, priors = model.world_model.compute_priors(states, prev_action)
-            posteriors = model.world_model.recognition(obs_dist.mean, h_states, priors)
-
-            # Deterministic decoding: use posterior mean
-            z1 = posteriors[0].mean
-            policy_dist = model.planning_engine.amortized_policy(z1, h_states[0])
-            probs = policy_dist.probs[0]
-
-            token_id = int(torch.argmax(probs).item())
-            conf = float(probs[token_id].item())
-
-            # Stop conditions
-            if token_id in (tokenizer.eos_id, tokenizer.pad_id, tokenizer.bos_id):
+            obs = m.markov_blanket.encode_batch([context])
+            h_states, priors = m.world_model.compute_priors(states, prev_action)
+            post = m.world_model.recognition(obs.mean, h_states, priors)
+            z1 = post[0].mean
+            pd = m.planning_engine.amortized_policy(z1, h_states[0])
+            tid = int(torch.argmax(pd.probs[0]).item())
+            if tid in (tok.eos_id, tok.pad_id, tok.bos_id):
                 break
-
-            token_str = tokenizer.decode([token_id])
-            if token_str == "":
+            s = tok.decode([tid])
+            if s == "":
                 break
+            generated += s
+            states = m.world_model.sample_posteriors(h_states, post, use_mean=True)
+            prev_action = torch.tensor([tid], dtype=torch.long, device=m.config.resolve_device())
+    return generated.strip() or "(no answer)"
 
-            generated += token_str
-            steps.append({'token': token_str, 'confidence': conf})
 
-            # Carry recurrent state forward and remember the action taken
-            states = model.world_model.sample_posteriors(h_states, posteriors, use_mean=True)
-            prev_action = torch.tensor([token_id], dtype=torch.long, device=device)
+def generate_language(prompt, max_tokens=140, temperature=0.7):
+    """Story-style generation: sliding window, temperature sampling, stop at EOS."""
+    if lang_model is None:
+        return None
+    m = lang_model
+    tok = m.markov_blanket.tokenizer
+    dev = m.config.resolve_device()
+    generated = prompt
+    with torch.no_grad():
+        states = m.world_model.get_initial_states(1, dev, torch.float32)
+        prev_action = None
+        for _ in range(max_tokens):
+            context = generated[-LANG_CONTEXT_WINDOW:] if generated else " "
+            obs = m.markov_blanket.encode_batch([context])
+            h_states, priors = m.world_model.compute_priors(states, prev_action)
+            post = m.world_model.recognition(obs.mean, h_states, priors)
+            z1 = post[0].mean
+            pd = m.planning_engine.amortized_policy(z1, h_states[0])
+            logits = pd.logits[0]
+            if temperature and temperature > 0:
+                probs = torch.softmax(logits / temperature, dim=-1)
+                tid = int(torch.multinomial(probs, 1).item())
+            else:
+                tid = int(torch.argmax(logits).item())
+            if tid in (tok.eos_id, tok.pad_id, tok.bos_id):
+                break
+            s = tok.decode([tid])
+            if s == "":
+                break
+            generated += s
+            states = m.world_model.sample_posteriors(h_states, post, use_mean=True)
+            prev_action = torch.tensor([tid], dtype=torch.long, device=dev)
+    return generated.strip()
 
-    answer = generated.strip()
-    if answer == "":
-        answer = "(no answer)"
-
-    return {
-        'answer': answer,
-        'steps': steps
-    }
 
 @app.route('/')
 def home():
-    """Main page"""
     return render_template('index.html')
+
 
 @app.route('/ask', methods=['POST'])
 def ask():
-    """Handle question from user"""
     try:
         data = request.json
         question = data.get('question', '').strip()
-        
         if not question:
             return jsonify({'error': 'Please enter a question'}), 400
-        
-        # Get AI prediction (full multi-token answer)
-        result = predict_answer(question)
-        
+
+        math_answer = generate_math(question)
+        lang_answer = generate_language(question)
+
         return jsonify({
             'success': True,
             'question': question,
-            'answer': result['answer'],
-            'steps': result['steps'],
-            # Keep 'predictions' for backward-compat with the existing UI
-            'predictions': [{'token': result['answer'], 'confidence': result['steps'][0]['confidence'] if result['steps'] else 0.0}]
+            'math_answer': math_answer,
+            'language_answer': lang_answer
         })
-    
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/examples')
 def examples():
-    """Return example questions"""
     return jsonify({
         'examples': [
-            "If A = 1 and B = 2, then A + B =",
-            "Write the next number in sequence: 2, 4, 6, 8,",
+            "1+1=",
+            "Capital of France is",
             "The antonym of hot is",
-            "Complete the logic: sky is blue, grass is",
-            "Write the next letters in sequence: A, C, E, G,",
-            "If count of X in XXYXX is",
-            "Capital of France is"
+            "Once upon a time",
+            "The little boy",
+            "If A = 1 and B = 2, then A + B ="
         ]
     })
 
+
 if __name__ == '__main__':
-    # Load model before starting server
-    load_model()
-    
-    print("\n" + "="*60)
-    print("🚀 THEMIS AI WEB INTERFACE")
-    print("="*60)
-    print("\n✓ Server starting...")
-    print("✓ Open your browser and go to: http://localhost:5000")
-    print("✓ Press Ctrl+C to stop the server\n")
-    
-    # Start Flask server
+    load_models()
+    print("\n" + "=" * 60)
+    print("THEMIS AI WEB INTERFACE (math + language)")
+    print("=" * 60)
+    print("Open: http://localhost:5000\n")
     app.run(host='0.0.0.0', port=5000, debug=False)

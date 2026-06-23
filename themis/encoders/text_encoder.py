@@ -148,11 +148,12 @@ class TextEncoder(nn.Module):
             torch.zeros(1, dims.max_seq_len, dims.token_embed_dim)
         )
         
-        # Transformer Layers (Compact for 4GB VRAM)
+        # Transformer Layers (scaled with embedding dim for larger models)
+        n_heads = 8 if dims.token_embed_dim % 8 == 0 else 4
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=dims.token_embed_dim,
-            nhead=4,
-            dim_feedforward=256,
+            nhead=n_heads,
+            dim_feedforward=dims.token_embed_dim * 4,
             dropout=0.1,
             activation="gelu",
             batch_first=True,
@@ -160,7 +161,7 @@ class TextEncoder(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
-            num_layers=2
+            num_layers=8
         )
         
         # Projection head to mean and log-variance of observation embedding

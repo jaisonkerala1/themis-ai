@@ -1,7 +1,6 @@
 """
-Chat with the language-trained Themis.
-Generates English text autoregressively using a sliding context window
-and carrying the recurrent state forward (matches training).
+Interactive chat with the language-trained Themis.
+Type a prompt, the AI continues it in English. Type 'quit' to exit.
 """
 import sys
 import os
@@ -15,7 +14,7 @@ from themis.layers.orchestrator import Orchestrator
 CONTEXT_WINDOW = 64
 
 
-def generate(model, device, prompt, max_tokens=120, temperature=0.8):
+def generate(model, device, prompt, max_tokens=150, temperature=0.7):
     tokenizer = model.markov_blanket.tokenizer
     generated = prompt
     with torch.no_grad():
@@ -29,61 +28,58 @@ def generate(model, device, prompt, max_tokens=120, temperature=0.8):
             z1 = posteriors[0].mean
             policy_dist = model.planning_engine.amortized_policy(z1, h_states[0])
             logits = policy_dist.logits[0]
-
-            # Temperature sampling for more natural text
             if temperature and temperature > 0:
                 probs = torch.softmax(logits / temperature, dim=-1)
                 token_id = int(torch.multinomial(probs, 1).item())
             else:
                 token_id = int(torch.argmax(logits).item())
-
             if token_id in (tokenizer.eos_id, tokenizer.pad_id, tokenizer.bos_id):
                 break
             tok = tokenizer.decode([token_id])
             if tok == "":
                 break
             generated += tok
-
             states = model.world_model.sample_posteriors(h_states, posteriors, use_mean=True)
             prev_action = torch.tensor([token_id], dtype=torch.long, device=device)
     return generated
 
 
 def main():
-    config = ThemisConfig()
-    device = config.resolve_device()
-    model = Orchestrator(config)
-    # Prefer the combined foundation model, then language-only
-    if os.path.exists("checkpoint_combined.pt"):
-        ckpt = "checkpoint_combined.pt"
-    elif os.path.exists("checkpoint_language.pt"):
-        ckpt = "checkpoint_language.pt"
-    else:
-        print("No language/combined checkpoint found. Train first.")
+    ckpt = "checkpoint_language.pt"
+    if not os.path.exists(ckpt):
+        print(f"'{ckpt}' not found. Download it from Google Drive (MyDrive/themis/) into this folder first.")
         return
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(ckpt, map_location=device, weights_only=False)
-    if checkpoint.get("config") is not None:
-        config = checkpoint["config"]
-        model = Orchestrator(config)
-        device = config.resolve_device()
+    # Use the checkpoint's own config so dimensions always match the weights
+    config = checkpoint["config"] if checkpoint.get("config") is not None else ThemisConfig()
+    model = Orchestrator(config)
     model.load_state_dict(checkpoint['model_state'])
     model = model.to(device)
     model.eval()
-    print(f"Loaded {ckpt} on {device}\n")
 
-    prompts = [
-        "Once upon a time",
-        "One day, a little",
-        "The dog",
-        "She was very happy because",
-        "1+1=",
-        "Capital of France is",
-    ]
-    for p in prompts:
-        out = generate(model, device, p)
-        print(f"PROMPT: {p}")
-        print(f"  -> {out}")
-        print()
+    print("=" * 60)
+    print("  THEMIS LANGUAGE CHAT  (type 'quit' to exit)")
+    print("=" * 60)
+    print(f"Loaded {ckpt} on {device}")
+    print("Tip: start a sentence and the AI continues it.")
+    print("Try: 'Once upon a time' or 'The little boy'")
+    print()
+
+    while True:
+        try:
+            prompt = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nBye!")
+            break
+        if prompt.lower() in ("quit", "exit", "q"):
+            print("Bye!")
+            break
+        if not prompt:
+            continue
+        out = generate(model, device, prompt)
+        print(f"AI : {out}\n")
 
 
 if __name__ == "__main__":

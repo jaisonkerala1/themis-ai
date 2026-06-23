@@ -322,21 +322,16 @@
                 document.getElementById(loadingId).remove();
                 
                 if (data.success) {
-                    // Show AI response: full answer first, then the per-step breakdown
                     let responseHtml = '<strong>🤖 Themis AI:</strong><br>';
-                    responseHtml += `<div style="font-size:1.3em; margin:8px 0;"><strong>${data.answer}</strong></div>`;
 
-                    if (data.steps && data.steps.length > 0) {
-                        responseHtml += '<div style="opacity:0.7; font-size:0.85em;">Generated step by step:</div>';
-                        data.steps.forEach((step, idx) => {
-                            const confidence = (step.confidence * 100).toFixed(0);
-                            responseHtml += `
-                                <div class="prediction">
-                                    ${idx + 1}. "<strong>${step.token}</strong>"
-                                    <span class="confidence">${confidence}%</span>
-                                </div>
-                            `;
-                        });
+                    if (data.language_answer) {
+                        responseHtml += '<div style="opacity:0.7; font-size:0.85em; margin-top:6px;">📖 Language model (stories):</div>';
+                        responseHtml += `<div style="font-size:1.05em; margin:4px 0 10px 0;">${data.language_answer}</div>`;
+                    }
+
+                    if (data.math_answer) {
+                        responseHtml += '<div style="opacity:0.7; font-size:0.85em;">🔢 Math/QA model:</div>';
+                        responseHtml += `<div style="font-size:1.2em; margin:4px 0;"><strong>${data.math_answer}</strong></div>`;
                     }
 
                     addMessage('ai', responseHtml);

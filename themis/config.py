@@ -45,18 +45,18 @@ class CoreDims:
     Kept small to fit in 4GB VRAM.
     """
     # Latent state dimensions per hierarchy level
-    state_dim: int = 384            # Hidden state size (s) [SCALED for Colab T4]
-    state_dim_stochastic: int = 96  # Stochastic part of state (z) [SCALED]
-    state_dim_deterministic: int = 288  # Deterministic part (h) [SCALED]
+    state_dim: int = 1024            # Hidden state size (s) [SCALED to ~200M]
+    state_dim_stochastic: int = 256  # Stochastic part of state (z) [SCALED]
+    state_dim_deterministic: int = 768  # Deterministic part (h) [SCALED]
 
     # Observation / embedding dimensions
-    obs_embed_dim: int = 384       # Encoded observation dimension [SCALED]
-    action_dim: int = 192          # Action embedding dimension [SCALED]
+    obs_embed_dim: int = 1024      # Encoded observation dimension [SCALED]
+    action_dim: int = 512          # Action embedding dimension [SCALED]
 
     # Text-specific
     vocab_size: int = 8192         # Small BPE vocabulary (text-first, compact)
     max_seq_len: int = 512         # Maximum sequence length
-    token_embed_dim: int = 384     # Token embedding dimension [SCALED]
+    token_embed_dim: int = 1024    # Token embedding dimension [SCALED]
 
     # Hierarchy
     n_hierarchy_levels: int = 3    # Number of world model levels
@@ -82,12 +82,12 @@ class PerceptionConfig:
 class WorldModelConfig:
     """Layer 3: Hierarchical RSSM generative model."""
     n_levels: int = 3
-    state_dim: int = 384
-    state_dim_stochastic: int = 96
-    state_dim_deterministic: int = 288
-    action_dim: int = 192
-    obs_embed_dim: int = 384
-    hidden_dim: int = 768          # MLP hidden layer size [SCALED for Colab T4]
+    state_dim: int = 1024
+    state_dim_stochastic: int = 256
+    state_dim_deterministic: int = 768
+    action_dim: int = 512
+    obs_embed_dim: int = 1024
+    hidden_dim: int = 2560         # MLP hidden layer size [SCALED to ~200M]
     n_categories: int = 16         # For categorical latent (if used)
     min_std: float = 0.1           # Minimum std for Gaussian posteriors
     timescales: tuple = (1, 4, 16)
@@ -140,6 +140,8 @@ class TrainingConfig:
     # observation reconstruction (VFE). Defaults preserve original behavior.
     vfe_weight: float = 1.0
     policy_loss_weight: float = 1.0
+    freeze_encoder: bool = True    # freeze sensory encoder (True for math model);
+                                   # set False for language so the transformer trains
 
 
 # =============================================================================

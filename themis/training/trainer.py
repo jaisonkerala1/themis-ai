@@ -30,9 +30,12 @@ class ActiveInferenceTrainer:
         self.device = config.resolve_device()
         self.dtype = config.resolve_dtype()
         
-        # Freeze sensory encoder to prevent representation collapse and moving target representations
-        for param in self.orchestrator.markov_blanket.encoder.parameters():
-            param.requires_grad = False
+        # Optionally freeze sensory encoder (prevents representation collapse for
+        # the VFE-driven math model). For language we WANT the encoder/transformer
+        # to train, so this is configurable.
+        if getattr(config.training, "freeze_encoder", True):
+            for param in self.orchestrator.markov_blanket.encoder.parameters():
+                param.requires_grad = False
             
         # Setup Optimizer over trainable orchestrator parameters
         trainable_params = [p for p in self.orchestrator.parameters() if p.requires_grad]
